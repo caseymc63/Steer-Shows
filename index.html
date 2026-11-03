@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steer Show Tracker</title>
+<style>
+  /* =========================================================
+     EDIT YOUR SHOWS IN THE <script> BLOCK AT THE BOTTOM (SHOWS list)
+     ========================================================= */
+  :root{
+    --bg:#f6f2ea; --card:#ffffff; --ink:#2a2118; --muted:#7a6a58;
+    --accent:#8b3a1e; --accent2:#c98a2b; --line:#e6ddcf; --good:#3d6b3a; --warn:#b5541c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1b1713; --card:#26201a; --ink:#f3ebe0; --muted:#b3a28d;
+      --accent:#e07b4f; --accent2:#e2b15a; --line:#3a3027; --good:#8fc28a; --warn:#f0a26a;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:Georgia,"Times New Roman",serif;line-height:1.4}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 16px 48px}
+  .sans{font-family:system-ui,sans-serif}
+  header{text-align:center;margin-bottom:20px}
+  header .eyebrow{font-family:system-ui,sans-serif;letter-spacing:.18em;
+    text-transform:uppercase;font-size:12px;color:var(--muted)}
+  header h1{margin:6px 0 0;font-size:clamp(26px,5vw,40px)}
+  .today{font-family:system-ui,sans-serif;font-size:14px;color:var(--muted);margin-top:4px}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  .hero{text-align:center;padding:28px 20px}
+  .hero .label{font-family:system-ui,sans-serif;font-size:13px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--accent)}
+  .hero h2{margin:6px 0 2px;font-size:clamp(22px,4vw,30px)}
+  .hero .where{font-family:system-ui,sans-serif;color:var(--muted);font-size:15px}
+  .big{font-size:clamp(84px,20vw,150px);font-weight:700;line-height:1;
+    color:var(--accent);margin:18px 0 0}
+  .bigsub{font-family:system-ui,sans-serif;font-size:18px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.15em}
+  .clock{display:flex;justify-content:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .clock div{min-width:70px;background:var(--bg);border:1px solid var(--line);
+    border-radius:10px;padding:8px 6px}
+  .clock b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+  .clock span{font-family:system-ui,sans-serif;font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.1em}
+  .bar{height:10px;background:var(--line);border-radius:99px;margin:22px auto 6px;
+    max-width:520px;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));
+    border-radius:99px;transition:width .6s}
+  .barlbl{font-family:system-ui,sans-serif;font-size:12px;color:var(--muted)}
+  .note{font-family:system-ui,sans-serif;font-size:14px;margin-top:12px}
+
+  h3{font-family:system-ui,sans-serif;font-size:13px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);margin:30px 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .card .n{font-weight:700;font-size:17px}
+  .card .m{font-family:system-ui,sans-serif;font-size:13px;color:var(--muted)}
+  .card .d{text-align:right;flex-shrink:0}
+  .card .d b{display:block;font-size:30px;color:var(--accent);line-height:1}
+  .card .d span{font-family:system-ui,sans-serif;font-size:11px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.08em}
+  .past .card{opacity:.55}
+  .past .card .d b{color:var(--good);font-size:16px}
+  .empty{text-align:center;font-family:system-ui,sans-serif;color:var(--muted);padding:24px}
+  details summary{cursor:pointer;font-family:system-ui,sans-serif;font-size:13px;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:30px 0 10px}
+
+  /* ---- weights ---- */
+  form.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  form.row label{display:flex;flex-direction:column;font-family:system-ui,sans-serif;
+    font-size:12px;color:var(--muted);gap:4px;flex:1 1 130px}
+  input,select{font:16px system-ui,sans-serif;padding:9px 10px;border-radius:8px;
+    border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+  button{font:600 14px system-ui,sans-serif;padding:10px 16px;border-radius:8px;border:0;
+    background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  button.tiny{padding:3px 8px;font-size:12px;font-weight:500}
+  .msg{font-family:system-ui,sans-serif;font-size:13px;color:var(--good);min-height:18px;margin-top:8px}
+  .steers{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .steer{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .steer .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .steer .nm{font-weight:700;font-size:19px}
+  .steer .own{font-family:system-ui,sans-serif;font-size:13px;color:var(--muted)}
+  .steer .wt{font-size:34px;font-weight:700;color:var(--accent);line-height:1;margin-top:10px}
+  .steer .wt small{font:14px system-ui,sans-serif;color:var(--muted)}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;
+    font-family:system-ui,sans-serif}
+  .stats div{background:var(--bg);border-radius:8px;padding:7px 9px}
+  .stats span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .stats b{font-size:16px}
+  .stats .bad{color:var(--warn)} .stats .ok{color:var(--good)}
+  svg.spark{width:100%;height:70px;margin-top:12px;display:block}
+  table{width:100%;border-collapse:collapse;font:13px system-ui,sans-serif;margin-top:6px}
+  td,th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--muted);font-weight:500}
+  .steer details summary{margin:12px 0 0;font-size:11px}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .fine{font-family:system-ui,sans-serif;font-size:12px;color:var(--muted);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Show Season</div>
+    <h1 id="title"></h1>
+    <div class="today" id="today"></div>
+  </header>
+
+  <section class="panel hero" id="hero"></section>
+
+  <!-- ===== WEIGHTS ===== -->
+  <h3>Log a weight</h3>
+  <div class="panel">
+    <form class="row" id="wForm">
+      <label>Steer<select id="wSteer" required></select></label>
+      <label>Date<input type="date" id="wDate" required></label>
+      <label>Weight (lb)<input type="number" id="wLbs" min="50" max="2500" step="1" inputmode="numeric" required></label>
+      <button type="submit">Save weight</button>
+    </form>
+    <div class="msg" id="wMsg"></div>
+
+    <details>
+      <summary>+ Add a steer</summary>
+      <form class="row" id="sForm">
+        <label>Steer name / tag<input id="sName" required></label>
+        <label>Exhibitor<input id="sOwner" placeholder="optional"></label>
+        <label>Target show weight (lb)<input type="number" id="sTarget" min="0" step="5" inputmode="numeric" placeholder="optional"></label>
+        <button type="submit">Add steer</button>
+      </form>
+    </details>
+  </div>
+
+  <h3>Steers</h3>
+  <div class="steers" id="steers"></div>
+  <div class="tools">
+    <button class="ghost" id="expBtn" type="button">Export CSV</button>
+    <button class="ghost" id="impBtn" type="button">Import CSV</button>
+    <input type="file" id="impFile" accept=".csv,text/csv" hidden>
+  </div>
+  <div class="fine">Weights are saved in this browser on this device. Use Export CSV to back them up or move them to another phone.</div>
+
+  <h3>All upcoming shows</h3>
+  <div class="grid" id="upcoming"></div>
+
+  <details id="pastWrap" hidden>
+    <summary>Completed shows</summary>
+    <div class="grid past" id="past"></div>
+  </details>
+</div>
+
+<script>
+/* =========================================================
+   EDIT HERE — one line per show.
+   date: "YYYY-MM-DD" of the steer show
+   time: "HH:MM" 24-hour (optional; used for the live clock)
+   ========================================================= */
+const TITLE = "McMurphy Show Steers";
+const SHOWS = [
+  { name: "Sand Hills Stock Show & Rodeo", location: "Odessa, TX", date: "2027-01-09", time: "", note: "Steer show" },
+  { name: "Fort Worth Stock Show & Rodeo", location: "Fort Worth, TX", date: "2027-02-04", time: "", note: "Steer show" },
+  { name: "San Antonio Stock Show & Rodeo", location: "San Antonio, TX", date: "2027-02-24", time: "", note: "Steer show" },
+  { name: "Rodeo Austin", location: "Austin, TX", date: "2027-03-11", time: "", note: "Steer show" },
+  { name: "Houston Livestock Show and Rodeo", location: "Houston, TX", date: "2027-03-15", time: "", note: "Steer show" },
+];
+/* ========================================================= */
+
+const DAY = 86400000;
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function parseDate(s, t){
+  const [y,m,d] = s.split("-").map(Number);
+  const [hh,mm] = (t||"00:00").split(":").map(Number);
+  return new Date(y, m-1, d, hh||0, mm||0);
+}
+const midnight = dt => new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+const dayDiff = (a,b) => Math.round((midnight(b) - midnight(a)) / DAY); // b - a, in days
+const daysUntil = (show, now) => dayDiff(now, parseDate(show.date));
+const fmt = dt => dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"});
+const fmtShort = dt => dt.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+const isoToday = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+const shows = SHOWS.slice().sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+const nextShow = () => shows.find(s => daysUntil(s, new Date()) >= 0);
+
+/* ---------------- storage ---------------- */
+const KEY = "steerTracker.v1";
+let db = { steers: [], weights: [] };
+function load(){
+  try { const raw = localStorage.getItem(KEY); if(raw) db = JSON.parse(raw); } catch(e){}
+  db.steers ||= []; db.weights ||= [];
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
+  catch(e){ flash("Couldn't save in this browser — export a CSV to keep your data.", true); return false; }
+}
+function flash(t, bad){
+  const m = $("wMsg"); m.textContent = t; m.style.color = bad ? "var(--warn)" : "var(--good)";
+  clearTimeout(flash._t); flash._t = setTimeout(()=>m.textContent="", 4000);
+}
+
+/* ---------------- countdown ---------------- */
+let lastKey = "";
+function renderCountdown(){
+  const now = new Date();
+  $("title").textContent = TITLE;
+  $("today").textContent = "Today is " + now.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+
+  const up = shows.filter(s => daysUntil(s, now) >= 0);
+  const past = shows.filter(s => daysUntil(s, now) < 0).reverse();
+  const next = up[0];
+
+  if(!next){
+    $("hero").innerHTML = `<div class="empty">No upcoming shows on the list. Add the next one to the SHOWS list.</div>`;
+  } else {
+    const d = daysUntil(next, now);
+    let ms = Math.max(0, parseDate(next.date, next.time) - now);
+    const cd = Math.floor(ms/DAY); ms -= cd*DAY;
+    const ch = Math.floor(ms/3600000); ms -= ch*3600000;
+    const cm = Math.floor(ms/60000); ms -= cm*60000;
+    const cs = Math.floor(ms/1000);
+
+    const prev = past[0];
+    const start = prev ? midnight(parseDate(prev.date)) : new Date(midnight(parseDate(next.date)) - 120*DAY);
+    const total = midnight(parseDate(next.date)) - start;
+    const pct = Math.min(100, Math.max(0, (midnight(now) - start) / total * 100));
+
+    const big = d === 0 ? "🏆" : d;
+    const sub = d === 0 ? "Show day — good luck!" : (d === 1 ? "day to go" : "days to go");
+    const weeks = d >= 14 ? ` · about ${Math.floor(d/7)} weeks` : "";
+
+    $("hero").innerHTML = `
+      <div class="label">Next show</div>
+      <h2>${esc(next.name)}</h2>
+      <div class="where">${esc(next.location)} · ${fmt(parseDate(next.date))}</div>
+      <div class="big">${big}</div>
+      <div class="bigsub">${sub}${weeks}</div>
+      ${d > 0 ? `<div class="clock">
+        <div><b>${cd}</b><span>days</span></div>
+        <div><b>${pad(ch)}</b><span>hours</span></div>
+        <div><b>${pad(cm)}</b><span>min</span></div>
+        <div><b>${pad(cs)}</b><span>sec</span></div>
+      </div>` : ""}
+      <div class="bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+      <div class="barlbl">${prev ? "Since " + esc(prev.name) : "Final 120 days"} · ${Math.round(pct)}% of the way there</div>
+      ${next.note ? `<div class="note">${esc(next.note)}</div>` : ""}`;
+  }
+
+  const key = midnight(now).toDateString();
+  if(key !== lastKey){
+    lastKey = key;
+    $("upcoming").innerHTML = up.length ? up.map(s=>{
+      const d = daysUntil(s, now);
+      return `<div class="card">
+        <div><div class="n">${esc(s.name)}</div>
+        <div class="m">${esc(s.location)}<br>${fmt(parseDate(s.date))}</div></div>
+        <div class="d"><b>${d===0?"Today":d}</b><span>${d===0?"":(d===1?"day":"days")}</span></div>
+      </div>`;}).join("") : `<div class="empty">Nothing scheduled.</div>`;
+    $("pastWrap").hidden = !past.length;
+    $("past").innerHTML = past.map(s=>`<div class="card">
+        <div><div class="n">${esc(s.name)}</div>
+        <div class="m">${esc(s.location)}<br>${fmt(parseDate(s.date))}</div></div>
+        <div class="d"><b>✓ Shown</b></div></div>`).join("");
+    renderSteers(); // projections depend on the date
+  }
+}
+
+/* ---------------- weights ---------------- */
+function weightsFor(id){
+  return db.weights.filter(w=>w.steerId===id).sort((a,b)=>a.date.localeCompare(b.date));
+}
+const num = n => Math.round(n).toLocaleString();
+const adgTxt = n => (n>=0?"":"−") + Math.abs(n).toFixed(2);
+
+function spark(ws, target){
+  if(ws.length < 2) return "";
+  const W=300,H=70,P=6;
+  const t0 = parseDate(ws[0].date), t1 = parseDate(ws[ws.length-1].date);
+  const span = Math.max(1, t1 - t0);
+  let lo = Math.min(...ws.map(w=>w.lbs)), hi = Math.max(...ws.map(w=>w.lbs));
+  if(target){ lo = Math.min(lo,target); hi = Math.max(hi,target); }
+  const r = Math.max(1, hi-lo);
+  const x = d => P + (parseDate(d)-t0)/span*(W-2*P);
+  const y = v => H-P - (v-lo)/r*(H-2*P);
+  const pts = ws.map(w=>`${x(w.date).toFixed(1)},${y(w.lbs).toFixed(1)}`).join(" ");
+  const tl = target ? `<line x1="${P}" x2="${W-P}" y1="${y(target)}" y2="${y(target)}" stroke="var(--accent2)" stroke-dasharray="4 4" stroke-width="1.5"/>` : "";
+  const dots = ws.map(w=>`<circle cx="${x(w.date)}" cy="${y(w.lbs)}" r="3" fill="var(--accent)"/>`).join("");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Weight trend">${tl}
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>`;
+}
+
+function renderSteers(){
+  // steer picker
+  const sel = $("wSteer"), keep = sel.value;
+  sel.innerHTML = db.steers.length
+    ? db.steers.map(s=>`<option value="${s.id}">${esc(s.name)}${s.owner?" ("+esc(s.owner)+")":""}</option>`).join("")
+    : `<option value="">Add a steer first</option>`;
+  if(db.steers.some(s=>s.id===keep)) sel.value = keep;
+
+  const show = nextShow();
+  const showDate = show ? parseDate(show.date) : null;
+
+  $("steers").innerHTML = db.steers.length ? db.steers.map(s=>{
+    const ws = weightsFor(s.id);
+    const last = ws[ws.length-1], prev = ws[ws.length-2], first = ws[0];
+    let stats = "";
+    if(last){
+      const recentAdg = prev ? (last.lbs-prev.lbs)/Math.max(1,dayDiff(parseDate(prev.date),parseDate(last.date))) : null;
+      const allAdg = ws.length>1 ? (last.lbs-first.lbs)/Math.max(1,dayDiff(parseDate(first.date),parseDate(last.date))) : null;
+      const dToShow = showDate ? dayDiff(parseDate(last.date), showDate) : null;
+      const proj = (recentAdg!==null && dToShow!==null && dToShow>=0) ? last.lbs + recentAdg*dToShow : null;
+      const need = (s.target && dToShow>0) ? (s.target-last.lbs)/dToShow : null;
+      const cells = [];
+      if(recentAdg!==null) cells.push(`<div><span>ADG since last</span><b>${adgTxt(recentAdg)}</b></div>`);
+      if(allAdg!==null) cells.push(`<div><span>ADG overall</span><b>${adgTxt(allAdg)}</b></div>`);
+      if(proj!==null) cells.push(`<div><span>Proj. at ${esc(show.name)}</span><b class="${s.target ? (Math.abs(proj-s.target)<=25?"ok":"bad") : ""}">${num(proj)} lb</b></div>`);
+      if(s.target) cells.push(`<div><span>Target</span><b>${num(s.target)} lb</b></div>`);
+      if(need!==null) cells.push(`<div><span>ADG needed for target</span><b class="${recentAdg!==null && Math.abs(need-recentAdg)<=0.5?"ok":"bad"}">${adgTxt(need)}</b></div>`);
+      if(dToShow!==null && dToShow>=0) cells.push(`<div><span>Days to show</span><b>${dToShow}</b></div>`);
+      stats = `<div class="stats">${cells.join("")}</div>`;
+    }
+    const rows = ws.slice().reverse().map((w,i,arr)=>{
+      const p = arr[i+1];
+      const g = p ? (w.lbs-p.lbs)/Math.max(1,dayDiff(parseDate(p.date),parseDate(w.date))) : null;
+      return `<tr><td>${fmtShort(parseDate(w.date))}, ${w.date.slice(0,4)}</td><td>${num(w.lbs)}</td>
+        <td>${g===null?"—":adgTxt(g)}</td><td><button class="ghost tiny" data-delw="${w.id}">✕</button></td></tr>`;
+    }).join("");
+    return `<div class="steer">
+      <div class="top"><div class="nm">${esc(s.name)}</div><div class="own">${esc(s.owner||"")}</div></div>
+      ${last ? `<div class="wt">${num(last.lbs)} <small>lb · ${fmtShort(parseDate(last.date))}</small></div>`
+             : `<div class="fine">No weights yet — log one above.</div>`}
+      ${stats}
+      ${spark(ws, s.target)}
+      <details><summary>Weight history (${ws.length})</summary>
+        ${ws.length ? `<table><tr><th>Date</th><th>Lb</th><th>ADG</th><th></th></tr>${rows}</table>` : ""}
+        <div class="tools">
+          <button class="ghost tiny" data-target="${s.id}">Set target</button>
+          <button class="ghost tiny" data-dels="${s.id}">Remove steer</button>
+        </div>
+      </details>
+    </div>`;
+  }).join("") : `<div class="panel empty">No steers yet. Use “+ Add a steer” above to get started.</div>`;
+}
+
+$("wDate").value = isoToday();
+
+$("sForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const name = $("sName").value.trim(); if(!name) return;
+  const s = { id: uid(), name, owner: $("sOwner").value.trim(), target: Number($("sTarget").value)||null };
+  db.steers.push(s); save();
+  e.target.reset(); renderSteers(); $("wSteer").value = s.id;
+  flash(`Added ${name}.`);
+});
+
+$("wForm").addEventListener("submit", e=>{
+  e.preventDefault();
+  const steerId = $("wSteer").value, date = $("wDate").value, lbs = Number($("wLbs").value);
+  if(!steerId){ flash("Add a steer first.", true); return; }
+  if(!date || !lbs){ return; }
+  const dup = db.weights.find(w=>w.steerId===steerId && w.date===date);
+  if(dup){ dup.lbs = lbs; } else { db.weights.push({ id: uid(), steerId, date, lbs }); }
+  save(); $("wLbs").value = ""; renderSteers();
+  const s = db.steers.find(x=>x.id===steerId);
+  flash(`${dup?"Updated":"Saved"} ${num(lbs)} lb for ${s.name}.`);
+});
+
+$("steers").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.delw){
+    if(!confirm("Delete this weight?")) return;
+    db.weights = db.weights.filter(w=>w.id!==b.dataset.delw);
+  } else if(b.dataset.dels){
+    const s = db.steers.find(x=>x.id===b.dataset.dels);
+    if(!confirm(`Remove ${s.name} and all of their weights?`)) return;
+    db.steers = db.steers.filter(x=>x.id!==s.id);
+    db.weights = db.weights.filter(w=>w.steerId!==s.id);
+  } else if(b.dataset.target){
+    const s = db.steers.find(x=>x.id===b.dataset.target);
+    const v = prompt(`Target show weight for ${s.name} (lb). Leave blank to clear.`, s.target||"");
+    if(v===null) return;
+    s.target = Number(v)||null;
+  } else return;
+  save(); renderSteers();
+});
+
+/* ---------------- CSV backup ---------------- */
+const csvCell = v => /[",\n]/.test(String(v??"")) ? `"${String(v).replace(/"/g,'""')}"` : String(v??"");
+$("expBtn").addEventListener("click", ()=>{
+  const lines = ["steer,exhibitor,target_lb,date,weight_lb"];
+  db.steers.forEach(s=>{
+    const ws = weightsFor(s.id);
+    if(!ws.length) lines.push([s.name,s.owner,s.target||"","",""].map(csvCell).join(","));
+    ws.forEach(w=>lines.push([s.name,s.owner,s.target||"",w.date,w.lbs].map(csvCell).join(",")));
+  });
+  const blob = new Blob([lines.join("\n")], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `steer-weights-${isoToday()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+$("impBtn").addEventListener("click", ()=> $("impFile").click());
+$("impFile").addEventListener("change", async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const text = await f.text();
+  const parseLine = l => { const out=[]; let cur="",q=false;
+    for(let i=0;i<l.length;i++){ const c=l[i];
+      if(q){ if(c==='"'&&l[i+1]==='"'){cur+='"';i++;} else if(c==='"') q=false; else cur+=c; }
+      else if(c==='"') q=true; else if(c===','){out.push(cur);cur="";} else cur+=c; }
+    out.push(cur); return out; };
+  let added = 0;
+  text.split(/\r?\n/).slice(1).filter(l=>l.trim()).forEach(l=>{
+    const [name,owner,target,date,lbs] = parseLine(l).map(x=>x.trim());
+    if(!name) return;
+    let s = db.steers.find(x=>x.name.toLowerCase()===name.toLowerCase());
+    if(!s){ s = { id: uid(), name, owner: owner||"", target: Number(target)||null }; db.steers.push(s); }
+    if(date && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number(lbs)){
+      const dup = db.weights.find(w=>w.steerId===s.id && w.date===date);
+      if(dup) dup.lbs = Number(lbs); else { db.weights.push({id:uid(), steerId:s.id, date, lbs:Number(lbs)}); added++; }
+    }
+  });
+  save(); renderSteers(); e.target.value = "";
+  flash(`Imported ${added} new weight${added===1?"":"s"}.`);
+});
+
+load();
+renderCountdown();
+setInterval(renderCountdown, 1000);
+</script>
+</body>
+</html>
