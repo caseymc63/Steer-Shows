@@ -1,12 +1,12 @@
 /**
- * Site Worker entry — canyoncattleconsulting.com
+ * Steer Show Tracker Worker — mcmurphykids.canyoncattleconsulting.com
  *
- * /api/steers  -> steer tracker shared save (D1 database bound as DB, secret PIN)
- * everything else -> your normal site files (static assets), unchanged
+ * /api/steers     -> shared save (D1 database bound as DB, secret PIN)
+ * everything else -> the tracker page (index.html, bundled into this Worker)
  *
- * Put this file in your repo at src/index.js and point "main" at it in your
- * wrangler config (see the setup notes).
+ * Repo layout (all at the top level): index.html, index.js, wrangler.jsonc
  */
+import PAGE from "./index.html";
 
 const MAX_BYTES = 900_000;
 
@@ -87,6 +87,8 @@ export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname.replace(/\/+$/, "");
     if (path === "/api/steers") return steersApi.fetch(request, env);
-    return env.ASSETS.fetch(request);
+    return new Response(PAGE, {
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
+    });
   },
 };

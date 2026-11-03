@@ -1,11 +1,10 @@
 {
   "name": "steer-shows",
-  "main": "src/index.js",
+  "main": "index.js",
   "compatibility_date": "2026-10-01",
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html"], "fallthrough": true }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
