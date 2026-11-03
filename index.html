@@ -101,6 +101,8 @@
   .steer details summary{margin:12px 0 0;font-size:11px}
   .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
   .fine{font-family:system-ui,sans-serif;font-size:12px;color:var(--muted);margin-top:10px}
+  .tshow{font-family:system-ui,sans-serif;font-size:13px;color:var(--accent2);margin-top:4px}
+  .tools select{width:auto;font-size:13px;padding:4px 8px}
 </style>
 </head>
 <body>
@@ -120,7 +122,7 @@
       <label>Steer<select id="wSteer" required></select></label>
       <label>Date<input type="date" id="wDate" required></label>
       <label>Weight (lb)<input type="number" id="wLbs" min="50" max="2500" step="1" inputmode="numeric" required></label>
-      <button type="submit">Save weight</button>
+      <button type="button" id="wBtn">Save weight</button>
     </form>
     <div class="msg" id="wMsg"></div>
 
@@ -130,8 +132,10 @@
         <label>Steer name / tag<input id="sName" required></label>
         <label>Exhibitor<input id="sOwner" placeholder="optional"></label>
         <label>Target show weight (lb)<input type="number" id="sTarget" min="0" step="5" inputmode="numeric" placeholder="optional"></label>
-        <button type="submit">Add steer</button>
+        <label>Target show<select id="sShow"></select></label>
+        <button type="button" id="sBtn">Add steer</button>
       </form>
+      <div class="msg" id="sMsg"></div>
     </details>
   </div>
 
@@ -189,21 +193,27 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7
 
 const shows = SHOWS.slice().sort((a,b)=>parseDate(a.date)-parseDate(b.date));
 const nextShow = () => shows.find(s => daysUntil(s, new Date()) >= 0);
+// A steer's chosen show if it's still upcoming; otherwise the next show on the calendar.
+const steerShow = st => {
+  const pick = st.show && shows.find(x => x.name === st.show && daysUntil(x, new Date()) >= 0);
+  return pick || nextShow();
+};
 
 /* ---------------- storage ---------------- */
 const KEY = "steerTracker.v1";
 let db = { steers: [], weights: [] };
 function load(){
   try { const raw = localStorage.getItem(KEY); if(raw) db = JSON.parse(raw); } catch(e){}
-  db.steers ||= []; db.weights ||= [];
+  if(!db || typeof db!=="object") db = { steers: [], weights: [] };
+  db.steers = db.steers || []; db.weights = db.weights || [];
 }
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(db)); return true; }
   catch(e){ flash("Couldn't save in this browser — export a CSV to keep your data.", true); return false; }
 }
 function flash(t, bad){
-  const m = $("wMsg"); m.textContent = t; m.style.color = bad ? "var(--warn)" : "var(--good)";
-  clearTimeout(flash._t); flash._t = setTimeout(()=>m.textContent="", 4000);
+  ["wMsg","sMsg"].forEach(id=>{ const m=$(id); if(!m) return; m.textContent=t; m.style.color = bad ? "var(--warn)" : "var(--good)"; });
+  clearTimeout(flash._t); flash._t = setTimeout(()=>{ $("wMsg").textContent=""; $("sMsg").textContent=""; }, 4000);
 }
 
 /* ---------------- countdown ---------------- */
@@ -304,10 +314,16 @@ function renderSteers(){
     : `<option value="">Add a steer first</option>`;
   if(db.steers.some(s=>s.id===keep)) sel.value = keep;
 
-  const show = nextShow();
-  const showDate = show ? parseDate(show.date) : null;
+  // target-show picker in the add-steer form
+  const upShows = shows.filter(x => daysUntil(x, new Date()) >= 0);
+  const showOpts = cur => `<option value="">Next show (auto)</option>` + upShows.map(x=>
+    `<option value="${esc(x.name)}"${x.name===cur?" selected":""}>${esc(x.name)} · ${fmtShort(parseDate(x.date))}</option>`).join("");
+  const sShow = $("sShow"), keepShow = sShow.value;
+  sShow.innerHTML = showOpts(keepShow);
 
   $("steers").innerHTML = db.steers.length ? db.steers.map(s=>{
+    const show = steerShow(s);
+    const showDate = show ? parseDate(show.date) : null;
     const ws = weightsFor(s.id);
     const last = ws[ws.length-1], prev = ws[ws.length-2], first = ws[0];
     let stats = "";
@@ -334,6 +350,7 @@ function renderSteers(){
     }).join("");
     return `<div class="steer">
       <div class="top"><div class="nm">${esc(s.name)}</div><div class="own">${esc(s.owner||"")}</div></div>
+      <div class="tshow">${show ? `🎯 ${esc(show.name)} · ${fmtShort(parseDate(show.date))} · ${daysUntil(show,new Date())} days${s.show?"":" (next show)"}` : "No upcoming show"}</div>
       ${last ? `<div class="wt">${num(last.lbs)} <small>lb · ${fmtShort(parseDate(last.date))}</small></div>`
              : `<div class="fine">No weights yet — log one above.</div>`}
       ${stats}
@@ -341,7 +358,8 @@ function renderSteers(){
       <details><summary>Weight history (${ws.length})</summary>
         ${ws.length ? `<table><tr><th>Date</th><th>Lb</th><th>ADG</th><th></th></tr>${rows}</table>` : ""}
         <div class="tools">
-          <button class="ghost tiny" data-target="${s.id}">Set target</button>
+          <select data-show="${s.id}" aria-label="Target show">${showOpts(s.show)}</select>
+          <button class="ghost tiny" data-target="${s.id}">Set target weight</button>
           <button class="ghost tiny" data-dels="${s.id}">Remove steer</button>
         </div>
       </details>
@@ -351,26 +369,36 @@ function renderSteers(){
 
 $("wDate").value = isoToday();
 
-$("sForm").addEventListener("submit", e=>{
-  e.preventDefault();
-  const name = $("sName").value.trim(); if(!name) return;
-  const s = { id: uid(), name, owner: $("sOwner").value.trim(), target: Number($("sTarget").value)||null };
+// Buttons use click handlers (not form submission) so they work everywhere,
+// including embedded/sandboxed previews where form submits are blocked.
+function onEnter(form, fn){
+  $(form).addEventListener("submit", e=>{ e.preventDefault(); fn(); });
+  $(form).addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.tagName==="INPUT"){ e.preventDefault(); fn(); } });
+}
+function addSteer(){
+  const name = $("sName").value.trim();
+  if(!name){ flash("Type a steer name or tag first.", true); $("sName").focus(); return; }
+  const s = { id: uid(), name, owner: $("sOwner").value.trim(), target: Number($("sTarget").value)||null, show: $("sShow").value || "" };
   db.steers.push(s); save();
-  e.target.reset(); renderSteers(); $("wSteer").value = s.id;
+  $("sForm").reset(); renderSteers(); $("wSteer").value = s.id;
   flash(`Added ${name}.`);
-});
+}
+$("sBtn").addEventListener("click", addSteer);
+onEnter("sForm", addSteer);
 
-$("wForm").addEventListener("submit", e=>{
-  e.preventDefault();
+function addWeight(){
   const steerId = $("wSteer").value, date = $("wDate").value, lbs = Number($("wLbs").value);
   if(!steerId){ flash("Add a steer first.", true); return; }
-  if(!date || !lbs){ return; }
+  if(!date){ flash("Pick a date.", true); return; }
+  if(!lbs || lbs < 50){ flash("Enter a weight in pounds.", true); $("wLbs").focus(); return; }
   const dup = db.weights.find(w=>w.steerId===steerId && w.date===date);
   if(dup){ dup.lbs = lbs; } else { db.weights.push({ id: uid(), steerId, date, lbs }); }
   save(); $("wLbs").value = ""; renderSteers();
   const s = db.steers.find(x=>x.id===steerId);
   flash(`${dup?"Updated":"Saved"} ${num(lbs)} lb for ${s.name}.`);
-});
+}
+$("wBtn").addEventListener("click", addWeight);
+onEnter("wForm", addWeight);
 
 $("steers").addEventListener("click", e=>{
   const b = e.target.closest("button"); if(!b) return;
@@ -391,14 +419,21 @@ $("steers").addEventListener("click", e=>{
   save(); renderSteers();
 });
 
+$("steers").addEventListener("change", e=>{
+  const sel = e.target.closest("select[data-show]"); if(!sel) return;
+  const s = db.steers.find(x=>x.id===sel.dataset.show); if(!s) return;
+  s.show = sel.value; save(); renderSteers();
+  flash(`${s.name} is now aimed at ${sel.value || "the next show"}.`);
+});
+
 /* ---------------- CSV backup ---------------- */
 const csvCell = v => /[",\n]/.test(String(v??"")) ? `"${String(v).replace(/"/g,'""')}"` : String(v??"");
 $("expBtn").addEventListener("click", ()=>{
-  const lines = ["steer,exhibitor,target_lb,date,weight_lb"];
+  const lines = ["steer,exhibitor,target_lb,date,weight_lb,target_show"];
   db.steers.forEach(s=>{
     const ws = weightsFor(s.id);
-    if(!ws.length) lines.push([s.name,s.owner,s.target||"","",""].map(csvCell).join(","));
-    ws.forEach(w=>lines.push([s.name,s.owner,s.target||"",w.date,w.lbs].map(csvCell).join(",")));
+    if(!ws.length) lines.push([s.name,s.owner,s.target||"","","",s.show||""].map(csvCell).join(","));
+    ws.forEach(w=>lines.push([s.name,s.owner,s.target||"",w.date,w.lbs,s.show||""].map(csvCell).join(",")));
   });
   const blob = new Blob([lines.join("\n")], {type:"text/csv"});
   const a = document.createElement("a");
@@ -416,10 +451,11 @@ $("impFile").addEventListener("change", async e=>{
     out.push(cur); return out; };
   let added = 0;
   text.split(/\r?\n/).slice(1).filter(l=>l.trim()).forEach(l=>{
-    const [name,owner,target,date,lbs] = parseLine(l).map(x=>x.trim());
+    const [name,owner,target,date,lbs,tshow] = parseLine(l).map(x=>x.trim());
     if(!name) return;
     let s = db.steers.find(x=>x.name.toLowerCase()===name.toLowerCase());
-    if(!s){ s = { id: uid(), name, owner: owner||"", target: Number(target)||null }; db.steers.push(s); }
+    if(!s){ s = { id: uid(), name, owner: owner||"", target: Number(target)||null, show: "" }; db.steers.push(s); }
+    if(tshow) s.show = tshow;
     if(date && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number(lbs)){
       const dup = db.weights.find(w=>w.steerId===s.id && w.date===date);
       if(dup) dup.lbs = Number(lbs); else { db.weights.push({id:uid(), steerId:s.id, date, lbs:Number(lbs)}); added++; }
