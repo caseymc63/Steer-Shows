@@ -609,7 +609,8 @@ function renderSteers(){
       if(proj!==null) cells.push(`<div><span>Proj. at ${esc(show.name)}</span><b class="${s.target ? (Math.abs(proj-s.target)<=25?"ok":"bad") : ""}">${num(proj)} lb</b></div>`);
       if(s.target) cells.push(`<div><span>Target</span><b>${num(s.target)} lb</b></div>`);
       if(need!==null) cells.push(`<div><span>ADG needed for target</span><b class="${recentAdg!==null && Math.abs(need-recentAdg)<=0.5?"ok":"bad"}">${adgTxt(need)}</b></div>`);
-      if(dToShow!==null && dToShow>=0) cells.push(`<div><span>Days to show</span><b>${dToShow}</b></div>`);
+      const daysLeft = show ? daysUntil(show, new Date()) : null;   // counts down from today
+      if(daysLeft!==null && daysLeft>=0) cells.push(`<div><span>Days to show</span><b>${daysLeft}</b></div>`);
       stats = `<div class="stats">${cells.join("")}</div>`;
     }
     const rows = ws.slice().reverse().map((w,i,arr)=>{
